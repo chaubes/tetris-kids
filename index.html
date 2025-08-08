@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tetris Kids - Fun Block Puzzle Game!</title>
+  <meta name="description" content="A colorful and fun Tetris game designed for kids with bright colors and engaging sounds!">
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="/favicon.png">
+  
+  <!-- Open Graph / Social Media -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Tetris Kids - Fun Block Puzzle Game!">
+  <meta property="og:description" content="A colorful and fun Tetris game designed for kids">
+  <meta property="og:image" content="/og-image.png">
+  
+  <!-- Preload critical resources -->
+  <link rel="preload" href="/assets/fonts/comic-sans.woff2" as="font" type="font/woff2" crossorigin>
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="src/styles/main.css">
+</head>
+<body>
+  <!-- Menu Container -->
+  <div id="menuContainer" class="menu-container"></div>
+
+  <!-- Game Container -->
+  <div id="app" class="app-container hidden">
+    <!-- Header -->
+    <header class="game-header">
+      <h1 class="game-title">
+        🧩 Tetris Kids 🌈
+      </h1>
+      <div class="score-container">
+        <div class="score-item">
+          <span class="score-label">Score:</span>
+          <span id="score" class="score-value">0</span>
+        </div>
+        <div class="score-item">
+          <span class="score-label">Level:</span>
+          <span id="level" class="score-value">1</span>
+        </div>
+        <div class="score-item">
+          <span class="score-label">Lines:</span>
+          <span id="lines" class="score-value">0</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Game Area -->
+    <main class="game-main">
+      <!-- Game Board -->
+      <div class="game-board-container">
+        <canvas id="gameCanvas" class="game-canvas" width="320" height="640"></canvas>
+        <div id="gameOverlay" class="game-overlay hidden">
+          <div class="overlay-content">
+            <h2 id="overlayTitle" class="overlay-title">Game Over!</h2>
+            <p id="overlayMessage" class="overlay-message">Great job! Try again?</p>
+            <div class="overlay-buttons">
+              <button id="restartBtn" class="btn btn-primary">Play Again</button>
+              <button id="menuBtn" class="btn btn-secondary">Main Menu</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Side Panel -->
+      <aside class="game-sidebar">
+        <!-- Next Piece Preview -->
+        <div class="preview-container">
+          <h3 class="preview-title">Next Piece</h3>
+          <canvas id="nextPieceCanvas" class="preview-canvas" width="120" height="120"></canvas>
+        </div>
+
+        <!-- Game Controls -->
+        <div class="controls-container">
+          <h3 class="controls-title">Controls</h3>
+          <div class="control-buttons">
+            <button id="pauseBtn" class="btn btn-game">⏸️ Pause</button>
+            <button id="muteBtn" class="btn btn-game">🔊 Sound</button>
+          </div>
+          
+          <!-- Touch Controls for Mobile -->
+          <div class="touch-controls">
+            <div class="touch-row">
+              <button id="rotateBtn" class="btn btn-touch">↻</button>
+            </div>
+            <div class="touch-row">
+              <button id="leftBtn" class="btn btn-touch">←</button>
+              <button id="downBtn" class="btn btn-touch">↓</button>
+              <button id="rightBtn" class="btn btn-touch">→</button>
+            </div>
+            <div class="touch-row">
+              <button id="dropBtn" class="btn btn-touch">⇓</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="instructions-container">
+          <h3 class="instructions-title">How to Play</h3>
+          <ul class="instructions-list">
+            <li>Use arrow keys to move blocks</li>
+            <li>Press UP arrow to rotate</li>
+            <li>Complete rows to score points</li>
+            <li>Don't let blocks reach the top!</li>
+          </ul>
+        </div>
+      </aside>
+    </main>
+
+    <!-- Footer -->
+    <footer class="game-footer">
+      <p class="footer-text">Made with ❤️ for kids everywhere!</p>
+    </footer>
+  </div>
+
+  <!-- Loading Screen -->
+  <div id="loadingScreen" class="loading-screen">
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <p class="loading-text">Loading your awesome game...</p>
+    </div>
+  </div>
+
+  <!-- Main JavaScript -->
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

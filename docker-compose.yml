@@ -1,0 +1,65 @@
+services:
+  tetris-kids:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: tetris-kids:latest
+    container_name: tetris-kids-game
+    ports:
+      - "7301:8080"
+    restart: unless-stopped
+    
+    # Environment variables
+    environment:
+      - NODE_ENV=production
+      - TZ=UTC
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 32M
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Security
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=50m
+    
+    # Logging
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Labels for better container management
+    labels:
+      - "com.tetris.service=tetris-kids"
+      - "com.tetris.version=1.0.0"
+      - "com.tetris.description=Kid-friendly Tetris game"
+      - "traefik.enable=false"
+    
+    networks:
+      - tetris-network
+
+networks:
+  tetris-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
