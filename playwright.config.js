@@ -9,7 +9,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: 'http://localhost:3005',
+    baseURL: 'http://localhost:7301',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -28,9 +28,10 @@ export default defineConfig({
       use: { browserName: 'webkit' },
     },
   ],
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:3005',
-    reuseExistingServer: !process.env.CI,
-  },
+  // Using Docker container instead of dev server
+  // webServer: {
+  //   command: 'npm run dev',
+  //   url: 'http://localhost:7301',
+  //   reuseExistingServer: !process.env.CI,
+  // },
 });

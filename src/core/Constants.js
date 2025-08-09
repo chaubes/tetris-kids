@@ -281,9 +281,19 @@ export const ANIMATIONS = {
 
 // Mobile/Touch Configuration
 export const TOUCH_CONFIG = {
-  SWIPE_THRESHOLD: 50, // Minimum distance for swipe
-  TAP_THRESHOLD: 200, // Maximum time for tap (ms)
+  SWIPE_THRESHOLD: 40, // Minimum distance for swipe (reduced for better mobile responsiveness)
+  TAP_THRESHOLD: 150, // Maximum time for tap (ms) - reduced for faster response
   DOUBLE_TAP_THRESHOLD: 300, // Maximum time between taps (ms)
+  MIN_SWIPE_VELOCITY: 0.3, // Minimum velocity for swipe detection
+  MAX_TAP_DISTANCE: 15, // Maximum movement distance to still count as tap
+  
+  // Mobile-specific optimizations
+  MOBILE_OPTIMIZATIONS: {
+    REDUCED_PARTICLE_COUNT: true, // Reduce particles on mobile for performance
+    SIMPLIFIED_ANIMATIONS: true, // Use simpler animations on mobile
+    LOWER_CANVAS_DPI: true, // Cap device pixel ratio for better performance
+    DEBOUNCE_RESIZE: 250, // Debounce resize events (ms)
+  }
 };
 
 // Development/Debug Configuration

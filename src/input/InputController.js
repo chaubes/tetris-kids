@@ -88,30 +88,47 @@ export class InputController {
    * Setup individual touch button
    */
   setupTouchButton(button, action) {
+    // Set touch-friendly attributes
+    button.style.touchAction = 'manipulation';
+    button.style.userSelect = 'none';
+    button.style.webkitUserSelect = 'none';
+    button.style.webkitTouchCallout = 'none';
+    
     // Visual feedback on touch
     button.addEventListener('touchstart', event => {
       event.preventDefault();
+      event.stopPropagation();
       this.handleTouchButtonStart(action, button);
-    });
+    }, { passive: false });
 
     button.addEventListener('touchend', event => {
       event.preventDefault();
+      event.stopPropagation();
       this.handleTouchButtonEnd(action, button);
-    });
+    }, { passive: false });
 
     button.addEventListener('touchcancel', event => {
       event.preventDefault();
+      event.stopPropagation();
       this.handleTouchButtonEnd(action, button);
-    });
+    }, { passive: false });
+
+    // Prevent touch move from interfering
+    button.addEventListener('touchmove', event => {
+      event.preventDefault();
+      event.stopPropagation();
+    }, { passive: false });
 
     // Mouse events for desktop testing
     button.addEventListener('mousedown', event => {
       event.preventDefault();
+      event.stopPropagation();
       this.handleTouchButtonStart(action, button);
     });
 
     button.addEventListener('mouseup', event => {
       event.preventDefault();
+      event.stopPropagation();
       this.handleTouchButtonEnd(action, button);
     });
 
@@ -123,10 +140,26 @@ export class InputController {
     // Add accessibility attributes
     button.setAttribute('role', 'button');
     button.setAttribute('aria-label', this.getActionLabel(action));
+    button.setAttribute('tabindex', '0');
 
-    // Prevent context menu
+    // Prevent context menu and selection
     button.addEventListener('contextmenu', event => {
       event.preventDefault();
+    });
+
+    button.addEventListener('selectstart', event => {
+      event.preventDefault();
+    });
+
+    // Improve focus handling for accessibility
+    button.addEventListener('focus', () => {
+      if (!('ontouchstart' in window)) {
+        button.style.outline = '3px solid #ffeb3b';
+      }
+    });
+
+    button.addEventListener('blur', () => {
+      button.style.outline = '';
     });
   }
 
@@ -198,15 +231,26 @@ export class InputController {
 
     gameArea.addEventListener('touchstart', event => {
       this.handleTouchStart(event);
-    });
+    }, { passive: false });
 
     gameArea.addEventListener('touchmove', event => {
       this.handleTouchMove(event);
-    });
+    }, { passive: false });
 
     gameArea.addEventListener('touchend', event => {
       this.handleTouchEnd(event);
-    });
+    }, { passive: false });
+
+    // Add additional touch listeners for better mobile support
+    gameArea.addEventListener('touchcancel', event => {
+      this.handleTouchCancel(event);
+    }, { passive: false });
+
+    // Prevent default touch behaviors on the game area
+    gameArea.style.touchAction = 'none';
+    gameArea.style.userSelect = 'none';
+    gameArea.style.webkitUserSelect = 'none';
+    gameArea.style.webkitTouchCallout = 'none';
   }
 
   /**
@@ -267,7 +311,10 @@ export class InputController {
     const touch = event.touches[0];
     this.touchStartTime = Date.now();
     this.touchStartPos = { x: touch.clientX, y: touch.clientY };
+    this.touchCurrentPos = { x: touch.clientX, y: touch.clientY };
     this.isSwipeGesture = false;
+    this.swipeDirection = null;
+    this.hasMoved = false;
   }
 
   /**
@@ -277,12 +324,32 @@ export class InputController {
     if (!this.settings.swipeGestures || event.touches.length !== 1) return;
 
     const touch = event.touches[0];
+    this.touchCurrentPos = { x: touch.clientX, y: touch.clientY };
+    
     const deltaX = touch.clientX - this.touchStartPos.x;
     const deltaY = touch.clientY - this.touchStartPos.y;
     const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
+    // Mark as moved if we've gone beyond a small threshold
+    if (distance > 10) {
+      this.hasMoved = true;
+    }
+
     if (distance > TOUCH_CONFIG.SWIPE_THRESHOLD) {
       this.isSwipeGesture = true;
+      
+      // Determine swipe direction early for better responsiveness
+      const absX = Math.abs(deltaX);
+      const absY = Math.abs(deltaY);
+      
+      if (absX > absY) {
+        // Horizontal swipe
+        this.swipeDirection = deltaX > 0 ? 'right' : 'left';
+      } else {
+        // Vertical swipe
+        this.swipeDirection = deltaY > 0 ? 'down' : 'up';
+      }
+      
       event.preventDefault(); // Prevent scrolling
     }
   }
@@ -293,46 +360,60 @@ export class InputController {
   handleTouchEnd(event) {
     const touchDuration = Date.now() - this.touchStartTime;
 
-    // Handle tap gestures
-    if (!this.isSwipeGesture && touchDuration < TOUCH_CONFIG.TAP_THRESHOLD) {
+    // Handle tap gestures (only if we haven't moved much and it was quick)
+    if (!this.hasMoved && touchDuration < TOUCH_CONFIG.TAP_THRESHOLD) {
       // Single tap to drop (if not on a control button)
       if (!event.target.matches('.btn-touch')) {
         this.emitInputEvent('drop', 'tap');
         this.playInputSound('drop');
+        this.triggerVibration('light');
       }
       return;
     }
 
     // Handle swipe gestures
-    if (this.isSwipeGesture && event.changedTouches.length === 1) {
-      const touch = event.changedTouches[0];
-      const deltaX = touch.clientX - this.touchStartPos.x;
-      const deltaY = touch.clientY - this.touchStartPos.y;
-
-      const absX = Math.abs(deltaX);
-      const absY = Math.abs(deltaY);
-
-      // Determine swipe direction
-      if (absX > absY) {
-        // Horizontal swipe
-        const action = deltaX > 0 ? 'right' : 'left';
-        this.emitInputEvent(action, 'swipe');
-        this.playInputSound(action);
-        this.triggerVibration('medium');
-      } else {
-        // Vertical swipe
-        if (deltaY > 0) {
-          // Swipe down
+    if (this.isSwipeGesture && this.swipeDirection) {
+      event.preventDefault();
+      
+      // Use the direction we detected during the swipe for immediate response
+      switch (this.swipeDirection) {
+        case 'left':
+          this.emitInputEvent('left', 'swipe');
+          this.playInputSound('left');
+          this.triggerVibration('light');
+          break;
+        case 'right':
+          this.emitInputEvent('right', 'swipe');
+          this.playInputSound('right');
+          this.triggerVibration('light');
+          break;
+        case 'down':
           this.emitInputEvent('down', 'swipe');
           this.playInputSound('down');
-        } else {
-          // Swipe up (rotate)
+          this.triggerVibration('light');
+          break;
+        case 'up':
           this.emitInputEvent('rotate', 'swipe');
           this.playInputSound('rotate');
-          this.triggerVibration('light');
-        }
+          this.triggerVibration('medium');
+          break;
       }
     }
+
+    // Reset gesture state
+    this.isSwipeGesture = false;
+    this.swipeDirection = null;
+    this.hasMoved = false;
+  }
+
+  /**
+   * Handle touch gesture cancel
+   */
+  handleTouchCancel(event) {
+    // Reset gesture state
+    this.isSwipeGesture = false;
+    this.swipeDirection = null;
+    this.hasMoved = false;
   }
 
   /**

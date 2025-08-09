@@ -110,21 +110,65 @@ export class CanvasRenderer {
    * Setup canvas properties and scaling
    */
   setupCanvas() {
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2); // Cap DPR at 2 for performance on mobile
+    
+    // Calculate responsive canvas size for mobile
+    const container = this.canvas.parentElement;
+    const containerWidth = container ? container.clientWidth : window.innerWidth;
+    const containerHeight = container ? container.clientHeight : window.innerHeight;
+    
+    // Calculate scale factor for mobile responsiveness
+    const gameAspectRatio = CANVAS_CONFIG.GAME_WIDTH / CANVAS_CONFIG.GAME_HEIGHT;
+    const maxWidth = Math.min(containerWidth * 0.9, 400); // Max 400px width on mobile
+    const maxHeight = Math.min(containerHeight * 0.7, 800); // Max 800px height on mobile
+    
+    let displayWidth = CANVAS_CONFIG.GAME_WIDTH;
+    let displayHeight = CANVAS_CONFIG.GAME_HEIGHT;
+    
+    // Scale down for mobile if necessary
+    if (window.innerWidth <= 768) {
+      if (maxWidth / gameAspectRatio <= maxHeight) {
+        displayWidth = maxWidth;
+        displayHeight = maxWidth / gameAspectRatio;
+      } else {
+        displayHeight = maxHeight;
+        displayWidth = maxHeight * gameAspectRatio;
+      }
+    }
 
-    // Setup main canvas
-    this.canvas.width = CANVAS_CONFIG.GAME_WIDTH * dpr;
-    this.canvas.height = CANVAS_CONFIG.GAME_HEIGHT * dpr;
-    this.canvas.style.width = `${CANVAS_CONFIG.GAME_WIDTH}px`;
-    this.canvas.style.height = `${CANVAS_CONFIG.GAME_HEIGHT}px`;
+    // Setup main canvas with responsive sizing
+    this.canvas.width = displayWidth * dpr;
+    this.canvas.height = displayHeight * dpr;
+    this.canvas.style.width = `${displayWidth}px`;
+    this.canvas.style.height = `${displayHeight}px`;
+    this.canvas.style.maxWidth = '100%';
+    this.canvas.style.maxHeight = '100%';
+    this.canvas.style.objectFit = 'contain';
+    
+    // Store scale factors for rendering calculations
+    this.displayScale = displayWidth / CANVAS_CONFIG.GAME_WIDTH;
+    this.pixelRatio = dpr;
+    
     this.ctx.scale(dpr, dpr);
+    this.ctx.imageSmoothingEnabled = true;
+    this.ctx.imageSmoothingQuality = window.innerWidth <= 768 ? 'medium' : 'high';
 
-    // Setup preview canvas
-    this.previewCanvas.width = CANVAS_CONFIG.PREVIEW_SIZE * dpr;
-    this.previewCanvas.height = CANVAS_CONFIG.PREVIEW_SIZE * dpr;
-    this.previewCanvas.style.width = `${CANVAS_CONFIG.PREVIEW_SIZE}px`;
-    this.previewCanvas.style.height = `${CANVAS_CONFIG.PREVIEW_SIZE}px`;
+    // Setup preview canvas with responsive sizing
+    const previewDisplaySize = Math.max(80, Math.min(CANVAS_CONFIG.PREVIEW_SIZE, displayWidth * 0.3));
+    
+    this.previewCanvas.width = previewDisplaySize * dpr;
+    this.previewCanvas.height = previewDisplaySize * dpr;
+    this.previewCanvas.style.width = `${previewDisplaySize}px`;
+    this.previewCanvas.style.height = `${previewDisplaySize}px`;
+    this.previewCanvas.style.maxWidth = '100%';
+    this.previewCanvas.style.maxHeight = '100%';
+    
     this.previewCtx.scale(dpr, dpr);
+    this.previewCtx.imageSmoothingEnabled = true;
+    this.previewCtx.imageSmoothingQuality = window.innerWidth <= 768 ? 'medium' : 'high';
+    
+    // Store preview scale for rendering calculations
+    this.previewDisplaySize = previewDisplaySize;
   }
 
   /**
@@ -217,6 +261,19 @@ export class CanvasRenderer {
   clearCanvas(ctx, width, height) {
     ctx.fillStyle = COLORS.BOARD_BACKGROUND;
     ctx.fillRect(0, 0, width, height);
+  }
+  
+  /**
+   * Get scaled dimensions for current display
+   */
+  getScaledDimensions() {
+    const scale = this.displayScale || 1;
+    return {
+      gameWidth: CANVAS_CONFIG.GAME_WIDTH * scale,
+      gameHeight: CANVAS_CONFIG.GAME_HEIGHT * scale,
+      cellSize: BOARD_CONFIG.CELL_SIZE * scale,
+      scale: scale
+    };
   }
 
   /**
@@ -430,6 +487,15 @@ export class CanvasRenderer {
    * Update and render particle effects
    */
   updateAndRenderParticles(deltaTime) {
+    // Check if we should reduce particles for mobile performance
+    const isMobile = window.innerWidth <= 768;
+    const maxParticles = isMobile ? 20 : 50;
+    
+    // Limit particle count on mobile devices
+    if (this.sparkles.length > maxParticles) {
+      this.sparkles = this.sparkles.slice(0, maxParticles);
+    }
+    
     // Update sparkles
     this.sparkles = this.sparkles.filter(sparkle => {
       sparkle.x += sparkle.vx;
@@ -444,15 +510,17 @@ export class CanvasRenderer {
         this.ctx.arc(sparkle.x, sparkle.y, sparkle.size, 0, Math.PI * 2);
         this.ctx.fill();
 
-        // Star shape
-        this.ctx.strokeStyle = sparkle.color;
-        this.ctx.lineWidth = 1;
-        this.ctx.beginPath();
-        this.ctx.moveTo(sparkle.x - sparkle.size, sparkle.y);
-        this.ctx.lineTo(sparkle.x + sparkle.size, sparkle.y);
-        this.ctx.moveTo(sparkle.x, sparkle.y - sparkle.size);
-        this.ctx.lineTo(sparkle.x, sparkle.y + sparkle.size);
-        this.ctx.stroke();
+        // Simplified star shape on mobile for better performance
+        if (!isMobile || sparkle.life > 0.5) {
+          this.ctx.strokeStyle = sparkle.color;
+          this.ctx.lineWidth = 1;
+          this.ctx.beginPath();
+          this.ctx.moveTo(sparkle.x - sparkle.size, sparkle.y);
+          this.ctx.lineTo(sparkle.x + sparkle.size, sparkle.y);
+          this.ctx.moveTo(sparkle.x, sparkle.y - sparkle.size);
+          this.ctx.lineTo(sparkle.x, sparkle.y + sparkle.size);
+          this.ctx.stroke();
+        }
 
         this.ctx.restore();
         return true;

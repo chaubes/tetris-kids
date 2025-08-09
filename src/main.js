@@ -739,20 +739,39 @@ window.addEventListener('blur', () => {
 });
 
 /**
- * Handle window resize for responsive canvas
+ * Handle window resize for responsive canvas (debounced for performance)
  */
+let resizeTimeout;
 window.addEventListener('resize', () => {
-  console.log('Window resized');
+  console.log('Window resize triggered');
   
-  // Update touch controls visibility
-  if (inputController) {
-    inputController.updateTouchControlsVisibility();
+  // Clear the timeout if it exists
+  if (resizeTimeout) {
+    clearTimeout(resizeTimeout);
   }
   
-  // Resize canvas if needed
-  if (canvasRenderer) {
-    canvasRenderer.setupCanvas();
-  }
+  // Set a new timeout
+  resizeTimeout = setTimeout(() => {
+    console.log('Window resized - updating layout');
+    
+    // Update touch controls visibility
+    if (inputController) {
+      inputController.updateTouchControlsVisibility();
+    }
+    
+    // Resize canvas if needed
+    if (canvasRenderer) {
+      canvasRenderer.setupCanvas();
+    }
+    
+    // Force a re-render
+    if (gameEngine && canvasRenderer && gameEngine.isRunning) {
+      const gameData = gameEngine.getGameData();
+      if (gameData) {
+        canvasRenderer.render(gameData);
+      }
+    }
+  }, 250); // Debounce resize events for better performance
 });
 
 /**
