@@ -103,7 +103,7 @@ deploy_application() {
     fi
     
     print_status "Building Docker image..."
-    ${COMPOSE_CMD} build
+    ${COMPOSE_CMD} build --no-cache
     
     if [ $? -eq 0 ]; then
         print_success "Docker image built successfully ✓"
@@ -113,7 +113,7 @@ deploy_application() {
     fi
     
     print_status "Starting container..."
-    ${COMPOSE_CMD} up -d
+    ${COMPOSE_CMD} up -d --force-recreate
     
     if [ $? -eq 0 ]; then
         print_success "Container started successfully ✓"
