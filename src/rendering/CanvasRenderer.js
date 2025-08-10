@@ -112,6 +112,12 @@ export class CanvasRenderer {
   setupCanvas() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2); // Cap DPR at 2 for performance on mobile
     
+    // Ensure canvas elements exist
+    if (!this.canvas || !this.ctx) {
+      console.error('Main canvas or context not available');
+      return;
+    }
+    
     // Calculate responsive canvas size for mobile
     const container = this.canvas.parentElement;
     const containerWidth = container ? container.clientWidth : window.innerWidth;
@@ -136,6 +142,10 @@ export class CanvasRenderer {
       }
     }
 
+    // Ensure minimum canvas size
+    displayWidth = Math.max(displayWidth, 200);
+    displayHeight = Math.max(displayHeight, 400);
+
     // Setup main canvas with responsive sizing
     this.canvas.width = displayWidth * dpr;
     this.canvas.height = displayHeight * dpr;
@@ -149,26 +159,49 @@ export class CanvasRenderer {
     this.displayScale = displayWidth / CANVAS_CONFIG.GAME_WIDTH;
     this.pixelRatio = dpr;
     
+    // Reset and setup context
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset any existing transforms
     this.ctx.scale(dpr, dpr);
     this.ctx.imageSmoothingEnabled = true;
     this.ctx.imageSmoothingQuality = window.innerWidth <= 768 ? 'medium' : 'high';
 
+    console.log('🎨 Main canvas setup:', {
+      displayWidth,
+      displayHeight,
+      pixelWidth: this.canvas.width,
+      pixelHeight: this.canvas.height,
+      dpr,
+      scale: this.displayScale
+    });
+
     // Setup preview canvas with responsive sizing
-    const previewDisplaySize = Math.max(80, Math.min(CANVAS_CONFIG.PREVIEW_SIZE, displayWidth * 0.3));
-    
-    this.previewCanvas.width = previewDisplaySize * dpr;
-    this.previewCanvas.height = previewDisplaySize * dpr;
-    this.previewCanvas.style.width = `${previewDisplaySize}px`;
-    this.previewCanvas.style.height = `${previewDisplaySize}px`;
-    this.previewCanvas.style.maxWidth = '100%';
-    this.previewCanvas.style.maxHeight = '100%';
-    
-    this.previewCtx.scale(dpr, dpr);
-    this.previewCtx.imageSmoothingEnabled = true;
-    this.previewCtx.imageSmoothingQuality = window.innerWidth <= 768 ? 'medium' : 'high';
-    
-    // Store preview scale for rendering calculations
-    this.previewDisplaySize = previewDisplaySize;
+    if (this.previewCanvas && this.previewCtx) {
+      const previewDisplaySize = Math.max(80, Math.min(CANVAS_CONFIG.PREVIEW_SIZE, displayWidth * 0.3));
+      
+      this.previewCanvas.width = previewDisplaySize * dpr;
+      this.previewCanvas.height = previewDisplaySize * dpr;
+      this.previewCanvas.style.width = `${previewDisplaySize}px`;
+      this.previewCanvas.style.height = `${previewDisplaySize}px`;
+      this.previewCanvas.style.maxWidth = '100%';
+      this.previewCanvas.style.maxHeight = '100%';
+      
+      // Reset and setup preview context
+      this.previewCtx.setTransform(1, 0, 0, 1, 0, 0); // Reset any existing transforms
+      this.previewCtx.scale(dpr, dpr);
+      this.previewCtx.imageSmoothingEnabled = true;
+      this.previewCtx.imageSmoothingQuality = window.innerWidth <= 768 ? 'medium' : 'high';
+      
+      // Store preview scale for rendering calculations
+      this.previewDisplaySize = previewDisplaySize;
+      
+      console.log('🖼️ Preview canvas setup:', {
+        previewDisplaySize,
+        pixelWidth: this.previewCanvas.width,
+        pixelHeight: this.previewCanvas.height
+      });
+    } else {
+      console.warn('Preview canvas or context not available');
+    }
   }
 
   /**
@@ -201,57 +234,78 @@ export class CanvasRenderer {
    * Main render function
    */
   render(gameData, interpolation = 1) {
-    if (!gameData) return;
-
-    const currentTime = performance.now();
-    const deltaTime = currentTime - this.lastRenderTime;
-    this.lastRenderTime = currentTime;
-
-    // Clear main canvas
-    this.clearCanvas(this.ctx, CANVAS_CONFIG.GAME_WIDTH, CANVAS_CONFIG.GAME_HEIGHT);
-
-    // Render background
-    this.renderBackground();
-
-    // Render game board
-    this.renderBoard(gameData.board);
-
-    // Render ghost piece (preview where piece will land)
-    if (gameData.ghostPiece && gameData.ghostPiece.length > 0) {
-      this.renderGhostPiece(gameData.ghostPiece);
+    // Validate canvas and context
+    if (!this.ctx || !this.canvas) {
+      console.error('Canvas context not available for rendering');
+      return;
+    }
+    
+    if (!gameData) {
+      console.warn('No game data provided for rendering');
+      return;
     }
 
-    // Render current piece
-    if (gameData.currentPiece && gameData.currentPiece.length > 0) {
-      this.renderPiece(gameData.currentPiece, false, interpolation);
-    }
+    try {
+      const currentTime = performance.now();
+      const deltaTime = currentTime - this.lastRenderTime;
+      this.lastRenderTime = currentTime;
 
-    // Render clearing lines animation
-    if (gameData.clearingLines && gameData.clearingLines.length > 0) {
-      this.renderClearingLines(gameData.clearingLines, deltaTime);
-    }
+      // Clear main canvas
+      this.clearCanvas(this.ctx, CANVAS_CONFIG.GAME_WIDTH, CANVAS_CONFIG.GAME_HEIGHT);
 
-    // Render particle effects
-    this.updateAndRenderParticles(deltaTime);
+      // Render background
+      this.renderBackground();
 
-    // Render level up animation
-    if (this.levelUpAnimation.active) {
-      this.renderLevelUpAnimation(deltaTime);
-    }
+      // Render game board if available
+      if (gameData.board && Array.isArray(gameData.board)) {
+        this.renderBoard(gameData.board);
+      }
 
-    // Render debug info if enabled
-    if (DEBUG.SHOW_GRID) {
-      this.renderDebugGrid();
-    }
+      // Render ghost piece (preview where piece will land)
+      if (gameData.ghostPiece && Array.isArray(gameData.ghostPiece) && gameData.ghostPiece.length > 0) {
+        this.renderGhostPiece(gameData.ghostPiece);
+      }
 
-    // Render FPS if enabled
-    if (DEBUG.SHOW_FPS) {
-      this.renderFPS(1000 / deltaTime);
-    }
+      // Render current piece
+      if (gameData.currentPiece && Array.isArray(gameData.currentPiece) && gameData.currentPiece.length > 0) {
+        this.renderPiece(gameData.currentPiece, false, interpolation);
+      }
 
-    // Render next piece preview
-    if (gameData.nextPieces && gameData.nextPieces.length > 0) {
-      this.renderNextPiece(gameData.nextPieces[0]);
+      // Render clearing lines animation
+      if (gameData.clearingLines && Array.isArray(gameData.clearingLines) && gameData.clearingLines.length > 0) {
+        this.renderClearingLines(gameData.clearingLines, deltaTime);
+      }
+
+      // Render particle effects
+      this.updateAndRenderParticles(deltaTime);
+
+      // Render level up animation
+      if (this.levelUpAnimation.active) {
+        this.renderLevelUpAnimation(deltaTime);
+      }
+
+      // Render debug info if enabled
+      if (DEBUG.SHOW_GRID) {
+        this.renderDebugGrid();
+      }
+
+      // Render FPS if enabled
+      if (DEBUG.SHOW_FPS) {
+        this.renderFPS(1000 / deltaTime);
+      }
+
+      // Render next piece preview
+      if (gameData.nextPieces && Array.isArray(gameData.nextPieces) && gameData.nextPieces.length > 0) {
+        this.renderNextPiece(gameData.nextPieces[0]);
+      }
+    } catch (error) {
+      console.error('Error during canvas rendering:', error);
+      // Try to recover by clearing the canvas
+      try {
+        this.clearCanvas(this.ctx, CANVAS_CONFIG.GAME_WIDTH, CANVAS_CONFIG.GAME_HEIGHT);
+      } catch (clearError) {
+        console.error('Failed to clear canvas after render error:', clearError);
+      }
     }
   }
 
@@ -302,12 +356,23 @@ export class CanvasRenderer {
    * Render the game board with placed pieces
    */
   renderBoard(board) {
+    if (!board || !Array.isArray(board)) {
+      console.warn('Invalid board data provided to renderBoard');
+      return;
+    }
+    
     for (let y = 0; y < board.length; y++) {
-      for (let x = 0; x < board[y].length; x++) {
-        if (board[y][x] !== 0) {
+      const row = board[y];
+      if (!Array.isArray(row)) {
+        console.warn(`Invalid row data at index ${y}`);
+        continue;
+      }
+      
+      for (let x = 0; x < row.length; x++) {
+        if (row[x] !== 0 && row[x] !== null && row[x] !== undefined) {
           const blockX = x * BOARD_CONFIG.CELL_SIZE;
           const blockY = y * BOARD_CONFIG.CELL_SIZE;
-          this.renderBlock(blockX, blockY, board[y][x], false, 1.0);
+          this.renderBlock(blockX, blockY, row[x], false, 1.0);
         }
       }
     }

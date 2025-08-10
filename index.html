@@ -136,7 +136,73 @@
     </div>
   </div>
 
+  <!-- Debug info for mobile troubleshooting -->
+  <div id="debugInfo" style="position: fixed; top: 10px; left: 10px; background: rgba(0,0,0,0.8); color: white; padding: 10px; font-size: 12px; z-index: 10000; display: none; max-width: 300px; border-radius: 5px;">
+    <div id="debugContent">Loading debug info...</div>
+    <button onclick="document.getElementById('debugInfo').style.display='none'" style="margin-top: 5px;">Close</button>
+  </div>
+
   <!-- Main JavaScript -->
   <script type="module" src="src/main.js"></script>
+  
+  <!-- Debug script for mobile -->
+  <script>
+    // Show debug info on triple-tap
+    let tapCount = 0;
+    let tapTimeout;
+    
+    document.addEventListener('touchstart', function(e) {
+      tapCount++;
+      clearTimeout(tapTimeout);
+      
+      if (tapCount === 3) {
+        showDebugInfo();
+        tapCount = 0;
+      } else {
+        tapTimeout = setTimeout(() => {
+          tapCount = 0;
+        }, 1000);
+      }
+    });
+    
+    // Also show on Ctrl+D
+    document.addEventListener('keydown', function(e) {
+      if (e.ctrlKey && e.key === 'd') {
+        e.preventDefault();
+        showDebugInfo();
+      }
+    });
+    
+    function showDebugInfo() {
+      const debugDiv = document.getElementById('debugInfo');
+      const debugContent = document.getElementById('debugContent');
+      
+      const touchControls = document.querySelector('.touch-controls');
+      const gameCanvas = document.getElementById('gameCanvas');
+      
+      const info = {
+        'Screen Size': `${window.innerWidth} x ${window.innerHeight}`,
+        'Device Pixel Ratio': window.devicePixelRatio,
+        'Touch Support': 'ontouchstart' in window,
+        'Max Touch Points': navigator.maxTouchPoints,
+        'User Agent': navigator.userAgent.substring(0, 50) + '...',
+        'Touch Controls Found': !!touchControls,
+        'Touch Controls Display': touchControls ? getComputedStyle(touchControls).display : 'N/A',
+        'Touch Controls Visible': touchControls ? !touchControls.classList.contains('hidden') : 'N/A',
+        'Game Canvas Found': !!gameCanvas,
+        'Canvas Dimensions': gameCanvas ? `${gameCanvas.width} x ${gameCanvas.height}` : 'N/A',
+        'Canvas Style Size': gameCanvas ? `${gameCanvas.style.width} x ${gameCanvas.style.height}` : 'N/A',
+        'Canvas Client Size': gameCanvas ? `${gameCanvas.clientWidth} x ${gameCanvas.clientHeight}` : 'N/A'
+      };
+      
+      debugContent.innerHTML = Object.entries(info)
+        .map(([key, value]) => `<strong>${key}:</strong> ${value}`)
+        .join('<br>');
+      
+      debugDiv.style.display = 'block';
+    }
+    
+    console.log('Debug utilities loaded. Triple-tap screen or press Ctrl+D to show debug info.');
+  </script>
 </body>
 </html>

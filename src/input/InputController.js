@@ -672,21 +672,33 @@ export class InputController {
    * Detect input capabilities
    */
   detectInputCapabilities() {
-    // Check for touch capability
-    const hasTouchCapability = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    // Check for touch capability using multiple methods
+    const hasTouchCapability = (
+      'ontouchstart' in window ||
+      navigator.maxTouchPoints > 0 ||
+      navigator.msMaxTouchPoints > 0 ||
+      window.DocumentTouch && document instanceof window.DocumentTouch
+    );
+
+    // Also check screen size as an indicator of mobile device
+    const isMobileScreen = window.innerWidth <= 768;
 
     // Check for keyboard
     const hasKeyboardCapability = true; // Assume keyboard is available
 
-    // Update settings based on capabilities
-    this.settings.touchEnabled = hasTouchCapability;
+    // Update settings based on capabilities - enable touch on mobile screens or touch devices
+    this.settings.touchEnabled = hasTouchCapability || isMobileScreen;
     this.settings.keyboardEnabled = hasKeyboardCapability;
 
     // Log detected capabilities
     console.log('Input capabilities detected:', {
       touch: hasTouchCapability,
+      mobileScreen: isMobileScreen,
+      touchEnabled: this.settings.touchEnabled,
       keyboard: hasKeyboardCapability,
       vibration: this.vibrationSupported,
+      screenWidth: window.innerWidth,
+      maxTouchPoints: navigator.maxTouchPoints
     });
   }
 
@@ -695,13 +707,40 @@ export class InputController {
    */
   updateTouchControlsVisibility() {
     const touchControls = document.querySelector('.touch-controls');
-    if (!touchControls) return;
+    if (!touchControls) {
+      console.warn('Touch controls element not found');
+      return;
+    }
 
-    // Show touch controls on touch devices or when explicitly enabled
-    const shouldShowTouchControls =
-      this.settings.touchEnabled || ('ontouchstart' in window && window.innerWidth <= 768);
+    // Show touch controls on mobile screens, touch devices, or when explicitly enabled
+    const isMobileScreen = window.innerWidth <= 768;
+    const hasTouchCapability = (
+      'ontouchstart' in window ||
+      navigator.maxTouchPoints > 0 ||
+      navigator.msMaxTouchPoints > 0
+    );
+    
+    const shouldShowTouchControls = 
+      this.settings.touchEnabled || 
+      isMobileScreen || 
+      hasTouchCapability;
 
-    touchControls.style.display = shouldShowTouchControls ? 'flex' : 'none';
+    console.log('Touch controls visibility:', {
+      shouldShow: shouldShowTouchControls,
+      touchEnabled: this.settings.touchEnabled,
+      isMobileScreen,
+      hasTouchCapability,
+      currentDisplay: touchControls.style.display
+    });
+
+    if (shouldShowTouchControls) {
+      touchControls.style.display = 'flex';
+      touchControls.classList.remove('hidden');
+      console.log('✅ Touch controls shown');
+    } else {
+      touchControls.style.display = 'none';
+      console.log('❌ Touch controls hidden');
+    }
   }
 
   /**

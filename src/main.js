@@ -69,13 +69,36 @@ async function initializeGame() {
 async function initializeSystems() {
   console.log('🚀 Initializing game systems...');
   
-  // Get canvas elements
-  const gameCanvas = document.getElementById('gameCanvas');
-  const previewCanvas = document.getElementById('nextPieceCanvas');
+  // Get canvas elements with retry logic
+  let gameCanvas = document.getElementById('gameCanvas');
+  let previewCanvas = document.getElementById('nextPieceCanvas');
+  
+  // Wait a bit for DOM to be fully loaded
+  let retryCount = 0;
+  while ((!gameCanvas || !previewCanvas) && retryCount < 5) {
+    console.warn(`Canvas elements not found, retrying... (${retryCount + 1}/5)`);
+    await new Promise(resolve => setTimeout(resolve, 100));
+    gameCanvas = document.getElementById('gameCanvas');
+    previewCanvas = document.getElementById('nextPieceCanvas');
+    retryCount++;
+  }
   
   if (!gameCanvas || !previewCanvas) {
-    throw new Error('Required canvas elements not found');
+    throw new Error('Required canvas elements not found after retries');
   }
+  
+  console.log('✅ Canvas elements found:', {
+    gameCanvas: {
+      width: gameCanvas.width,
+      height: gameCanvas.height,
+      clientWidth: gameCanvas.clientWidth,
+      clientHeight: gameCanvas.clientHeight
+    },
+    previewCanvas: {
+      width: previewCanvas.width,
+      height: previewCanvas.height
+    }
+  });
   
   // Initialize core systems
   gameEngine = new GameEngine();
@@ -107,6 +130,13 @@ async function initializeSystems() {
       whimsy: whimsyInjector
     }
   });
+  
+  // Force initial touch controls visibility update
+  setTimeout(() => {
+    if (inputController) {
+      inputController.updateTouchControlsVisibility();
+    }
+  }, 100);
   
   console.log('🎮 All systems initialized and connected');
 }
@@ -411,33 +441,53 @@ function startGameWithSettings(settings) {
  * Start the main game loop
  */
 function startGameLoop() {
-  if (!gameEngine || !canvasRenderer || !animationManager) return;
+  if (!gameEngine || !canvasRenderer || !animationManager) {
+    console.error('Required systems not available for game loop');
+    return;
+  }
   
   console.log('🎮 Starting game loop');
   
   function gameLoop() {
-    const currentTime = performance.now();
-    
-    // Update animations
-    animationManager.update(16); // Assuming 60 FPS
-    
-    // Get game data for rendering
-    const gameData = gameEngine.getGameData();
-    const gameState = gameEngine.stateManager.getState();
-    
-    // Render the game
-    if (gameData && gameState.gameState === GAME_STATES.PLAYING) {
-      canvasRenderer.render(gameData);
-    }
-    
-    // Update UI
-    if (gameUI) {
-      gameUI.update(gameState, gameData);
-    }
-    
-    // Continue loop if game is running
-    if (gameEngine && gameEngine.isRunning) {
-      requestAnimationFrame(gameLoop);
+    try {
+      const currentTime = performance.now();
+      
+      // Update animations
+      animationManager.update(16); // Assuming 60 FPS
+      
+      // Get game data for rendering
+      const gameData = gameEngine.getGameData();
+      const gameState = gameEngine.stateManager.getState();
+      
+      // Always try to render something, even if not playing
+      if (gameData) {
+        canvasRenderer.render(gameData);
+      } else {
+        // Render empty state
+        canvasRenderer.render({
+          board: [],
+          currentPiece: [],
+          ghostPiece: [],
+          nextPieces: [],
+          clearingLines: []
+        });
+      }
+      
+      // Update UI
+      if (gameUI) {
+        gameUI.update(gameState, gameData);
+      }
+      
+      // Continue loop if game is running
+      if (gameEngine && gameEngine.isRunning) {
+        requestAnimationFrame(gameLoop);
+      }
+    } catch (error) {
+      console.error('Error in game loop:', error);
+      // Try to continue the loop despite errors
+      if (gameEngine && gameEngine.isRunning) {
+        requestAnimationFrame(gameLoop);
+      }
     }
   }
   
@@ -743,7 +793,10 @@ window.addEventListener('blur', () => {
  */
 let resizeTimeout;
 window.addEventListener('resize', () => {
-  console.log('Window resize triggered');
+  console.log('Window resize triggered:', {
+    innerWidth: window.innerWidth,
+    innerHeight: window.innerHeight
+  });
   
   // Clear the timeout if it exists
   if (resizeTimeout) {
@@ -754,22 +807,35 @@ window.addEventListener('resize', () => {
   resizeTimeout = setTimeout(() => {
     console.log('Window resized - updating layout');
     
-    // Update touch controls visibility
-    if (inputController) {
-      inputController.updateTouchControlsVisibility();
-    }
-    
-    // Resize canvas if needed
-    if (canvasRenderer) {
-      canvasRenderer.setupCanvas();
-    }
-    
-    // Force a re-render
-    if (gameEngine && canvasRenderer && gameEngine.isRunning) {
-      const gameData = gameEngine.getGameData();
-      if (gameData) {
-        canvasRenderer.render(gameData);
+    try {
+      // Update touch controls visibility first
+      if (inputController) {
+        inputController.updateTouchControlsVisibility();
       }
+      
+      // Resize canvas if needed
+      if (canvasRenderer) {
+        canvasRenderer.setupCanvas();
+      }
+      
+      // Force a re-render with fallback data
+      if (gameEngine && canvasRenderer) {
+        const gameData = gameEngine.getGameData();
+        if (gameData) {
+          canvasRenderer.render(gameData);
+        } else {
+          // Render empty state to test canvas
+          canvasRenderer.render({
+            board: Array(20).fill().map(() => Array(10).fill(0)),
+            currentPiece: [],
+            ghostPiece: [],
+            nextPieces: [],
+            clearingLines: []
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error during window resize handling:', error);
     }
   }, 250); // Debounce resize events for better performance
 });

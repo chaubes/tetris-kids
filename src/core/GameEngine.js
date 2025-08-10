@@ -553,19 +553,44 @@ export class GameEngine {
     const gameLogic = this.getSystem('gameLogic');
     const scoreManager = this.getSystem('scoreManager');
 
+    // Provide default data even if gameLogic is not available
+    const defaultBoard = Array(20).fill().map(() => Array(10).fill(0));
+    
     if (!gameLogic) {
-      return null;
+      console.warn('GameLogic system not available, returning default data');
+      return {
+        board: defaultBoard,
+        currentPiece: [],
+        ghostPiece: [],
+        nextPieces: [],
+        holdPiece: null,
+        clearingLines: [],
+        score: scoreManager ? scoreManager.getScoreData() : { score: 0, lines: 0, level: 1 },
+      };
     }
 
-    return {
-      board: gameLogic.getBoardState(),
-      currentPiece: gameLogic.getCurrentPiecePositions(),
-      ghostPiece: gameLogic.getGhostPiecePositions(),
-      nextPieces: gameLogic.getNextPieces(3),
-      holdPiece: gameLogic.holdPiece,
-      clearingLines: gameLogic.getClearingLines(),
-      score: scoreManager ? scoreManager.getScoreData() : null,
-    };
+    try {
+      return {
+        board: gameLogic.getBoardState() || defaultBoard,
+        currentPiece: gameLogic.getCurrentPiecePositions() || [],
+        ghostPiece: gameLogic.getGhostPiecePositions() || [],
+        nextPieces: gameLogic.getNextPieces(3) || [],
+        holdPiece: gameLogic.holdPiece || null,
+        clearingLines: gameLogic.getClearingLines() || [],
+        score: scoreManager ? scoreManager.getScoreData() : { score: 0, lines: 0, level: 1 },
+      };
+    } catch (error) {
+      console.error('Error getting game data:', error);
+      return {
+        board: defaultBoard,
+        currentPiece: [],
+        ghostPiece: [],
+        nextPieces: [],
+        holdPiece: null,
+        clearingLines: [],
+        score: { score: 0, lines: 0, level: 1 },
+      };
+    }
   }
 
   /**
