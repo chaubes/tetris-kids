@@ -359,16 +359,16 @@ export class GameEngine {
 
   /**
    * Setup input handlers for keyboard controls
+   * Note: Touch input is now handled by the InputController system
    */
   setupInputHandlers() {
-    // Keyboard event listeners
+    // Only setup keyboard event listeners here
+    // Touch input is handled by the dedicated InputController
     document.addEventListener('keydown', event => this.handleKeyDown(event));
     document.addEventListener('keyup', event => this.handleKeyUp(event));
 
-    // Touch event listeners for mobile (basic implementation)
-    document.addEventListener('touchstart', event => this.handleTouch(event, 'start'));
-    document.addEventListener('touchmove', event => this.handleTouch(event, 'move'));
-    document.addEventListener('touchend', event => this.handleTouch(event, 'end'));
+    // Note: Touch event listeners are NOT added here to avoid conflicts
+    // with the InputController system which handles touch input properly
   }
 
   /**
@@ -412,24 +412,17 @@ export class GameEngine {
 
   /**
    * Handle touch events (basic mobile support)
+   * Note: This method is deprecated in favor of InputController
    */
   handleTouch(event, phase) {
-    event.preventDefault();
-
-    this.inputBuffer.push({
-      type: 'touch',
-      phase,
-      touches: Array.from(event.touches).map(touch => ({
-        x: touch.clientX,
-        y: touch.clientY,
-        id: touch.identifier,
-      })),
-      timestamp: performance.now(),
-    });
+    // This method is now handled by InputController
+    // Keeping for compatibility but not actively used
+    console.warn('GameEngine.handleTouch() called - should use InputController instead');
   }
 
   /**
    * Process input buffer and send commands to game systems
+   * Note: Touch input is now processed via InputController events
    */
   processInput() {
     const state = this.stateManager.getState();
@@ -446,11 +439,12 @@ export class GameEngine {
       return;
     }
 
-    // Process each input event
+    // Process keyboard input events from the buffer
     this.inputBuffer.forEach(input => {
       if (input.type === 'keydown') {
         this.handleGameInput(input.key, gameLogic);
       }
+      // Touch input is handled by InputController events, not buffer
     });
 
     // Clear input buffer
@@ -458,7 +452,8 @@ export class GameEngine {
   }
 
   /**
-   * Handle game-specific input commands
+   * Handle game-specific input commands from keyboard
+   * Touch input commands are handled via InputController events in main.js
    */
   handleGameInput(key, gameLogic) {
     switch (key) {

@@ -50,15 +50,41 @@ export class InputController {
    * Initialize the input controller
    */
   initialize() {
-    this.setupTouchControls();
+    // Setup input systems in order
     this.setupKeyboardListeners();
-    this.setupTouchListeners();
     this.setupVisualFeedback();
     this.detectInputCapabilities();
-
+    
+    // Setup touch controls after DOM is ready
+    this.setupTouchControlsWhenReady();
+    
     console.log('🎮 InputController initialized');
   }
 
+  /**
+   * Setup touch control buttons when DOM is ready
+   */
+  setupTouchControlsWhenReady() {
+    // Use a timeout to ensure DOM is fully loaded
+    const attemptSetup = (attempts = 0) => {
+      if (attempts > 10) {
+        console.error('❌ Failed to find touch control buttons after 10 attempts');
+        return;
+      }
+      
+      const found = this.setupTouchControls();
+      if (!found) {
+        console.log(`⏳ Touch buttons not ready, retry ${attempts + 1}/10`);
+        setTimeout(() => attemptSetup(attempts + 1), 200);
+      } else {
+        console.log('✅ Touch controls setup complete');
+      }
+    };
+    
+    // Start setup immediately, with retries if needed
+    attemptSetup();
+  }
+  
   /**
    * Setup touch control buttons
    */
@@ -66,73 +92,111 @@ export class InputController {
     // Get touch control buttons from DOM
     const touchControlSelectors = {
       left: '#leftBtn',
-      right: '#rightBtn',
+      right: '#rightBtn', 
       down: '#downBtn',
       rotate: '#rotateBtn',
       drop: '#dropBtn',
     };
 
+    let buttonsFound = 0;
     Object.entries(touchControlSelectors).forEach(([action, selector]) => {
       const button = document.querySelector(selector);
       if (button) {
         this.touchButtons.set(action, button);
         this.setupTouchButton(button, action);
+        buttonsFound++;
+        console.log(`✅ Touch button found: ${action} (${selector})`);
+      } else {
+        console.warn(`❌ Touch button not found: ${action} (${selector})`);
       }
     });
 
+    // Setup touch gestures if we have buttons
+    if (buttonsFound > 0) {
+      this.setupTouchListeners();
+    }
+
     // Show/hide touch controls based on device
     this.updateTouchControlsVisibility();
+    
+    return buttonsFound > 0;
   }
 
   /**
    * Setup individual touch button
    */
   setupTouchButton(button, action) {
+    console.log(`🔧 Setting up touch button: ${action}`);
+    
     // Set touch-friendly attributes
     button.style.touchAction = 'manipulation';
     button.style.userSelect = 'none';
     button.style.webkitUserSelect = 'none';
     button.style.webkitTouchCallout = 'none';
+    button.style.webkitTapHighlightColor = 'transparent';
     
-    // Visual feedback on touch
-    button.addEventListener('touchstart', event => {
-      event.preventDefault();
-      event.stopPropagation();
-      this.handleTouchButtonStart(action, button);
-    }, { passive: false });
-
-    button.addEventListener('touchend', event => {
-      event.preventDefault();
-      event.stopPropagation();
-      this.handleTouchButtonEnd(action, button);
-    }, { passive: false });
-
-    button.addEventListener('touchcancel', event => {
-      event.preventDefault();
-      event.stopPropagation();
-      this.handleTouchButtonEnd(action, button);
-    }, { passive: false });
+    // Ensure button is visible and clickable
+    button.style.pointerEvents = 'auto';
+    button.style.zIndex = '1000';
+    
+    // Touch event listeners with better error handling
+    const touchStartHandler = (event) => {
+      try {
+        console.log(`👆 Touch start: ${action}`);
+        event.preventDefault();
+        event.stopPropagation();
+        this.handleTouchButtonStart(action, button);
+      } catch (error) {
+        console.error(`Error in touch start for ${action}:`, error);
+      }
+    };
+    
+    const touchEndHandler = (event) => {
+      try {
+        console.log(`👆 Touch end: ${action}`);
+        event.preventDefault();
+        event.stopPropagation();
+        this.handleTouchButtonEnd(action, button);
+      } catch (error) {
+        console.error(`Error in touch end for ${action}:`, error);
+      }
+    };
+    
+    // Add touch event listeners
+    button.addEventListener('touchstart', touchStartHandler, { passive: false });
+    button.addEventListener('touchend', touchEndHandler, { passive: false });
+    button.addEventListener('touchcancel', touchEndHandler, { passive: false });
 
     // Prevent touch move from interfering
-    button.addEventListener('touchmove', event => {
+    button.addEventListener('touchmove', (event) => {
       event.preventDefault();
       event.stopPropagation();
     }, { passive: false });
 
-    // Mouse events for desktop testing
-    button.addEventListener('mousedown', event => {
-      event.preventDefault();
-      event.stopPropagation();
-      this.handleTouchButtonStart(action, button);
+    // Mouse events for desktop testing and Playwright
+    button.addEventListener('mousedown', (event) => {
+      try {
+        console.log(`🖱️ Mouse down: ${action}`);
+        event.preventDefault();
+        event.stopPropagation();
+        this.handleTouchButtonStart(action, button);
+      } catch (error) {
+        console.error(`Error in mouse down for ${action}:`, error);
+      }
     });
 
-    button.addEventListener('mouseup', event => {
-      event.preventDefault();
-      event.stopPropagation();
-      this.handleTouchButtonEnd(action, button);
+    button.addEventListener('mouseup', (event) => {
+      try {
+        console.log(`🖱️ Mouse up: ${action}`);
+        event.preventDefault();
+        event.stopPropagation();
+        this.handleTouchButtonEnd(action, button);
+      } catch (error) {
+        console.error(`Error in mouse up for ${action}:`, error);
+      }
     });
 
-    button.addEventListener('mouseleave', event => {
+    button.addEventListener('mouseleave', (event) => {
       event.preventDefault();
       this.handleTouchButtonEnd(action, button);
     });
@@ -143,11 +207,11 @@ export class InputController {
     button.setAttribute('tabindex', '0');
 
     // Prevent context menu and selection
-    button.addEventListener('contextmenu', event => {
+    button.addEventListener('contextmenu', (event) => {
       event.preventDefault();
     });
 
-    button.addEventListener('selectstart', event => {
+    button.addEventListener('selectstart', (event) => {
       event.preventDefault();
     });
 
@@ -161,13 +225,24 @@ export class InputController {
     button.addEventListener('blur', () => {
       button.style.outline = '';
     });
+    
+    console.log(`✅ Touch button setup complete: ${action}`);
   }
 
   /**
    * Handle touch button press start
    */
   handleTouchButtonStart(action, button) {
-    if (!this.settings.touchEnabled) return;
+    console.log(`🚀 Touch button start: ${action}`);
+    
+    if (!this.settings.touchEnabled) {
+      console.warn(`⚠️ Touch disabled but button pressed! Action: ${action}`);
+      console.log('🔄 Auto-enabling touch due to button interaction...');
+      // If user is actively pressing touch buttons, they obviously have touch capability
+      // Auto-enable touch to fix the issue
+      this.settings.touchEnabled = true;
+      this.updateTouchControlsVisibility();
+    }
 
     // Visual feedback
     this.addTouchFeedback(button);
@@ -175,7 +250,8 @@ export class InputController {
     // Vibration feedback
     this.triggerVibration('light');
 
-    // Emit input event
+    // Emit input event - this is crucial for game functionality
+    console.log(`📡 Emitting input event: ${action} start`);
     this.emitInputEvent(action, 'start');
 
     // Setup repeat for movement actions
@@ -191,6 +267,8 @@ export class InputController {
    * Handle touch button press end
    */
   handleTouchButtonEnd(action, button) {
+    console.log(`🛑 Touch button end: ${action}`);
+    
     // Remove visual feedback
     this.removeTouchFeedback(button);
 
@@ -198,6 +276,7 @@ export class InputController {
     this.clearTouchRepeat(action);
 
     // Emit input event
+    console.log(`📡 Emitting input event: ${action} end`);
     this.emitInputEvent(action, 'end');
   }
 
@@ -669,36 +748,199 @@ export class InputController {
   }
 
   /**
-   * Detect input capabilities
+   * Enhanced mobile device detection with comprehensive fallbacks
    */
   detectInputCapabilities() {
-    // Check for touch capability using multiple methods
-    const hasTouchCapability = (
+    const userAgent = navigator.userAgent.toLowerCase();
+    
+    // Primary touch capability detection methods
+    const primaryTouchDetection = (
       'ontouchstart' in window ||
       navigator.maxTouchPoints > 0 ||
       navigator.msMaxTouchPoints > 0 ||
       window.DocumentTouch && document instanceof window.DocumentTouch
     );
 
-    // Also check screen size as an indicator of mobile device
-    const isMobileScreen = window.innerWidth <= 768;
+    // Enhanced mobile user agent detection with more patterns
+    const mobilePlatforms = [
+      'android', 'webos', 'iphone', 'ipad', 'ipod', 'blackberry', 'iemobile', 
+      'opera mini', 'mobile safari', 'chrome mobile', 'samsung', 'nokia',
+      'motorola', 'lg', 'htc', 'sony', 'kindle', 'silk', 'fennec'
+    ];
+    
+    const advancedUserAgentDetection = mobilePlatforms.some(platform => 
+      userAgent.includes(platform)
+    );
 
-    // Check for keyboard
-    const hasKeyboardCapability = true; // Assume keyboard is available
+    // Screen-based mobile detection with multiple breakpoints
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
+    const aspectRatio = Math.max(screenWidth, screenHeight) / Math.min(screenWidth, screenHeight);
+    
+    const screenBasedMobileDetection = (
+      // Small screens (phones)
+      screenWidth <= 768 ||
+      screenHeight <= 768 ||
+      // Tablet detection (larger but still mobile)
+      (screenWidth <= 1024 && aspectRatio > 1.2) ||
+      // Touch-first screen sizes
+      (screenWidth <= 900 && screenHeight <= 1400)
+    );
 
-    // Update settings based on capabilities - enable touch on mobile screens or touch devices
-    this.settings.touchEnabled = hasTouchCapability || isMobileScreen;
-    this.settings.keyboardEnabled = hasKeyboardCapability;
+    // Enhanced mobile feature detection
+    const mobileFeatureDetection = (
+      'orientation' in window ||
+      'ondevicemotion' in window ||
+      'ondeviceorientation' in window ||
+      'ontouchstart' in document.documentElement ||
+      navigator.standalone !== undefined || // iOS PWA capability
+      window.navigator.maxTouchPoints !== undefined ||
+      'onorientationchange' in window
+    );
 
-    // Log detected capabilities
-    console.log('Input capabilities detected:', {
-      touch: hasTouchCapability,
-      mobileScreen: isMobileScreen,
-      touchEnabled: this.settings.touchEnabled,
-      keyboard: hasKeyboardCapability,
-      vibration: this.vibrationSupported,
-      screenWidth: window.innerWidth,
-      maxTouchPoints: navigator.maxTouchPoints
+    // CSS media queries detection
+    let cssMediaQueryDetection = false;
+    try {
+      cssMediaQueryDetection = window.matchMedia && (
+        window.matchMedia('(pointer: coarse)').matches ||
+        window.matchMedia('(hover: none)').matches ||
+        window.matchMedia('(any-pointer: coarse)').matches
+      );
+    } catch (e) {
+      console.warn('CSS media query detection failed:', e);
+    }
+
+    // Device pixel ratio patterns (many mobile devices have high DPR)
+    const highDPRMobile = window.devicePixelRatio > 1.5;
+
+    // Browser-specific mobile detection
+    const browserMobileDetection = (
+      // Mobile Chrome
+      /chrome.*mobile/i.test(userAgent) ||
+      // Mobile Firefox
+      /firefox.*mobile/i.test(userAgent) ||
+      // Mobile Safari
+      /safari.*mobile/i.test(userAgent) ||
+      // Opera Mobile
+      /opera.*mobile/i.test(userAgent) ||
+      // Edge Mobile
+      /edge.*mobile/i.test(userAgent) ||
+      // Samsung Browser
+      /samsungbrowser/i.test(userAgent) ||
+      // UC Browser
+      /ucbrowser/i.test(userAgent)
+    );
+
+    // Hardware detection
+    const hardwareIndicators = (
+      navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 8 || // Mobile typically has fewer cores
+      navigator.deviceMemory && navigator.deviceMemory <= 4 || // Mobile typically has less RAM
+      navigator.connection && navigator.connection.effectiveType && 
+      ['slow-2g', '2g', '3g'].includes(navigator.connection.effectiveType)
+    );
+
+    // Combine all detection methods with different weights
+    const detectionResults = {
+      primaryTouch: primaryTouchDetection,
+      userAgent: advancedUserAgentDetection,
+      screen: screenBasedMobileDetection,
+      features: mobileFeatureDetection,
+      cssMedia: cssMediaQueryDetection,
+      browser: browserMobileDetection,
+      hardware: hardwareIndicators,
+      highDPR: highDPRMobile
+    };
+
+    // Count positive detections
+    const positiveDetections = Object.values(detectionResults).filter(Boolean).length;
+    const detectionScore = positiveDetections / Object.keys(detectionResults).length;
+
+    // Be very aggressive about mobile detection - even 1 positive detection should enable touch
+    const isMobileDevice = positiveDetections > 0;
+    
+    // Special case: if screen size suggests mobile, always enable touch regardless of other factors
+    const forceMobileByScreen = screenWidth <= 768 || screenHeight <= 768;
+
+    // Final decision: enable touch if ANY mobile indicator is present
+    this.settings.touchEnabled = isMobileDevice || forceMobileByScreen || detectionScore >= 0.25;
+    this.settings.keyboardEnabled = true; // Always enable keyboard as fallback
+
+    // Enhanced logging
+    console.log('🔍 Enhanced mobile detection results:', {
+      detectionResults,
+      positiveDetections,
+      detectionScore: Math.round(detectionScore * 100) + '%',
+      finalDecision: {
+        touchEnabled: this.settings.touchEnabled,
+        isMobileDevice,
+        forceMobileByScreen
+      },
+      deviceInfo: {
+        userAgent: userAgent.substring(0, 100) + '...',
+        screen: `${screenWidth}x${screenHeight}`,
+        aspectRatio: Math.round(aspectRatio * 100) / 100,
+        devicePixelRatio: window.devicePixelRatio,
+        maxTouchPoints: navigator.maxTouchPoints || 0,
+        hardwareConcurrency: navigator.hardwareConcurrency,
+        deviceMemory: navigator.deviceMemory,
+        connection: navigator.connection?.effectiveType
+      },
+      capabilities: {
+        vibration: this.vibrationSupported,
+        orientationAPI: 'orientation' in window,
+        deviceMotion: 'ondevicemotion' in window,
+        standalone: navigator.standalone
+      }
+    });
+
+    // Force enable if any strong mobile indicator
+    if (!this.settings.touchEnabled && (forceMobileByScreen || advancedUserAgentDetection)) {
+      console.warn('⚠️ Strong mobile indicators detected - force enabling touch!');
+      this.settings.touchEnabled = true;
+    }
+
+    // Runtime adjustment based on actual touch interaction
+    this.setupTouchDetectionAdjustment();
+  }
+
+  /**
+   * Setup runtime adjustment for touch detection based on actual user interaction
+   */
+  setupTouchDetectionAdjustment() {
+    // Monitor for actual touch events to auto-correct detection
+    const touchEventHandler = (event) => {
+      if (!this.settings.touchEnabled && event.type.startsWith('touch')) {
+        console.log('🔧 Actual touch event detected - enabling touch controls!');
+        this.settings.touchEnabled = true;
+        this.updateTouchControlsVisibility();
+        
+        // Remove the handler once we've corrected the detection
+        ['touchstart', 'touchend', 'touchmove'].forEach(eventType => {
+          document.removeEventListener(eventType, touchEventHandler);
+        });
+      }
+    };
+
+    // Listen for actual touch events as a final safety net
+    ['touchstart', 'touchend', 'touchmove'].forEach(eventType => {
+      document.addEventListener(eventType, touchEventHandler, { passive: true, once: false });
+    });
+
+    // Also check periodically if window size changes (orientation change, etc.)
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        const newWidth = window.innerWidth;
+        const newHeight = window.innerHeight;
+        
+        // Re-evaluate if screen size now suggests mobile
+        if ((newWidth <= 768 || newHeight <= 768) && !this.settings.touchEnabled) {
+          console.log('🔄 Screen size change suggests mobile - enabling touch!');
+          this.settings.touchEnabled = true;
+          this.updateTouchControlsVisibility();
+        }
+      }, 250);
     });
   }
 
@@ -708,7 +950,9 @@ export class InputController {
   updateTouchControlsVisibility() {
     const touchControls = document.querySelector('.touch-controls');
     if (!touchControls) {
-      console.warn('Touch controls element not found');
+      console.warn('Touch controls element not found - retrying in 500ms');
+      // Retry after a short delay in case DOM isn't ready
+      setTimeout(() => this.updateTouchControlsVisibility(), 500);
       return;
     }
 
@@ -725,12 +969,13 @@ export class InputController {
       isMobileScreen || 
       hasTouchCapability;
 
-    console.log('Touch controls visibility:', {
+    console.log('🎮 Touch controls visibility check:', {
       shouldShow: shouldShowTouchControls,
       touchEnabled: this.settings.touchEnabled,
       isMobileScreen,
       hasTouchCapability,
-      currentDisplay: touchControls.style.display
+      currentDisplay: touchControls.style.display,
+      hasHiddenClass: touchControls.classList.contains('hidden')
     });
 
     if (shouldShowTouchControls) {
@@ -739,6 +984,7 @@ export class InputController {
       console.log('✅ Touch controls shown');
     } else {
       touchControls.style.display = 'none';
+      touchControls.classList.add('hidden');
       console.log('❌ Touch controls hidden');
     }
   }
@@ -789,6 +1035,8 @@ export class InputController {
    * Emit input event to game systems
    */
   emitInputEvent(action, type) {
+    console.log(`📤 Emitting input event: ${action} ${type}`);
+    
     // Add to input buffer
     this.inputBuffer.push({
       action: action,
@@ -801,8 +1049,16 @@ export class InputController {
       this.inputBuffer.shift();
     }
 
-    // Emit event
+    // Emit event - this is how the game receives input
+    console.log(`📡 Broadcasting input event: ${action} ${type}`);
     this.emit('input', { action, type });
+    
+    // Debug: check if we have listeners
+    if (this.eventListeners && this.eventListeners.has('input')) {
+      console.log(`📻 Input event has ${this.eventListeners.get('input').length} listeners`);
+    } else {
+      console.warn('⚠️ No input event listeners found!');
+    }
   }
 
   /**
@@ -828,7 +1084,20 @@ export class InputController {
    * Update input settings
    */
   updateSettings(newSettings) {
+    console.log('🔧 Updating input settings:', newSettings);
+    const oldSettings = { ...this.settings };
     this.settings = { ...this.settings, ...newSettings };
+    
+    // If touch was manually enabled, make sure we respect that
+    if (newSettings.touchEnabled === true) {
+      console.log('✅ Touch manually enabled via settings');
+    }
+    
+    // Re-detect capabilities if this is a settings update that might affect detection
+    if (newSettings.hasOwnProperty('touchEnabled') && newSettings.touchEnabled === undefined) {
+      console.log('🔄 Re-detecting input capabilities...');
+      this.detectInputCapabilities();
+    }
 
     // Update touch controls visibility
     this.updateTouchControlsVisibility();
@@ -841,6 +1110,12 @@ export class InputController {
     if (newSettings.repeatRate) {
       this.repeatRate = newSettings.repeatRate;
     }
+    
+    console.log('🔧 Settings updated:', {
+      old: oldSettings,
+      new: this.settings,
+      changes: Object.keys(newSettings)
+    });
   }
 
   /**
@@ -889,14 +1164,22 @@ export class InputController {
    * Event emission system
    */
   emit(event, ...args) {
+    console.log(`📢 InputController emitting event: ${event}`, args);
+    
     if (this.eventListeners && this.eventListeners.has(event)) {
-      this.eventListeners.get(event).forEach(callback => {
+      const listeners = this.eventListeners.get(event);
+      console.log(`📻 Found ${listeners.length} listeners for ${event}`);
+      
+      listeners.forEach((callback, index) => {
         try {
+          console.log(`📞 Calling listener ${index + 1}/${listeners.length} for ${event}`);
           callback(...args);
         } catch (error) {
-          console.error(`Error in InputController ${event} listener:`, error);
+          console.error(`Error in InputController ${event} listener ${index}:`, error);
         }
       });
+    } else {
+      console.warn(`⚠️ No listeners found for event: ${event}`);
     }
   }
 
@@ -914,9 +1197,187 @@ export class InputController {
   }
 
   /**
+   * Force enable touch controls (for mobile compatibility)
+   */
+  forceEnableTouch() {
+    console.log('🔧 Force enabling touch controls...');
+    
+    // Force enable touch
+    this.settings.touchEnabled = true;
+    
+    // Re-setup touch controls
+    const success = this.setupTouchControls();
+    
+    // Update visibility
+    this.updateTouchControlsVisibility();
+    
+    console.log(success ? '✅ Touch force-enabled successfully' : '❌ Touch force-enable failed');
+    return success;
+  }
+  
+  /**
+   * Force setup touch controls (for debugging)
+   */
+  forceSetupTouchControls() {
+    console.log('🔧 Force setting up touch controls...');
+    const success = this.setupTouchControls();
+    if (success) {
+      console.log('✅ Force setup successful');
+    } else {
+      console.error('❌ Force setup failed');
+    }
+    return success;
+  }
+
+  /**
+   * Get debug information with enhanced mobile detection details
+   */
+  getDebugInfo() {
+    const touchButtons = {};
+    this.touchButtons.forEach((button, action) => {
+      touchButtons[action] = {
+        found: !!button,
+        id: button?.id || 'unknown',
+        visible: button ? !button.classList.contains('hidden') : false,
+        styles: button ? {
+          display: getComputedStyle(button).display,
+          visibility: getComputedStyle(button).visibility,
+          pointerEvents: getComputedStyle(button).pointerEvents
+        } : null
+      };
+    });
+
+    // Run enhanced detection for debug info
+    const userAgent = navigator.userAgent.toLowerCase();
+    
+    // Recreate detection results for debugging
+    const primaryTouchDetection = (
+      'ontouchstart' in window ||
+      navigator.maxTouchPoints > 0 ||
+      navigator.msMaxTouchPoints > 0 ||
+      window.DocumentTouch && document instanceof window.DocumentTouch
+    );
+
+    const mobilePlatforms = [
+      'android', 'webos', 'iphone', 'ipad', 'ipod', 'blackberry', 'iemobile', 
+      'opera mini', 'mobile safari', 'chrome mobile', 'samsung', 'nokia',
+      'motorola', 'lg', 'htc', 'sony', 'kindle', 'silk', 'fennec'
+    ];
+    
+    const advancedUserAgentDetection = mobilePlatforms.some(platform => 
+      userAgent.includes(platform)
+    );
+
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
+    const aspectRatio = Math.max(screenWidth, screenHeight) / Math.min(screenWidth, screenHeight);
+    
+    const screenBasedMobileDetection = (
+      screenWidth <= 768 ||
+      screenHeight <= 768 ||
+      (screenWidth <= 1024 && aspectRatio > 1.2) ||
+      (screenWidth <= 900 && screenHeight <= 1400)
+    );
+
+    const mobileFeatureDetection = (
+      'orientation' in window ||
+      'ondevicemotion' in window ||
+      'ondeviceorientation' in window ||
+      'ontouchstart' in document.documentElement ||
+      navigator.standalone !== undefined ||
+      window.navigator.maxTouchPoints !== undefined ||
+      'onorientationchange' in window
+    );
+
+    let cssMediaQueryDetection = false;
+    try {
+      cssMediaQueryDetection = window.matchMedia && (
+        window.matchMedia('(pointer: coarse)').matches ||
+        window.matchMedia('(hover: none)').matches ||
+        window.matchMedia('(any-pointer: coarse)').matches
+      );
+    } catch (e) {
+      // Ignore errors
+    }
+
+    const browserMobileDetection = (
+      /chrome.*mobile/i.test(userAgent) ||
+      /firefox.*mobile/i.test(userAgent) ||
+      /safari.*mobile/i.test(userAgent) ||
+      /opera.*mobile/i.test(userAgent) ||
+      /edge.*mobile/i.test(userAgent) ||
+      /samsungbrowser/i.test(userAgent) ||
+      /ucbrowser/i.test(userAgent)
+    );
+
+    const hardwareIndicators = (
+      navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 8 ||
+      navigator.deviceMemory && navigator.deviceMemory <= 4 ||
+      navigator.connection && navigator.connection.effectiveType && 
+      ['slow-2g', '2g', '3g'].includes(navigator.connection.effectiveType)
+    );
+
+    const detectionResults = {
+      primaryTouch: primaryTouchDetection,
+      userAgent: advancedUserAgentDetection,
+      screen: screenBasedMobileDetection,
+      features: mobileFeatureDetection,
+      cssMedia: cssMediaQueryDetection,
+      browser: browserMobileDetection,
+      hardware: hardwareIndicators,
+      highDPR: window.devicePixelRatio > 1.5
+    };
+
+    const positiveDetections = Object.values(detectionResults).filter(Boolean).length;
+    const detectionScore = positiveDetections / Object.keys(detectionResults).length;
+    
+    return {
+      settings: this.settings,
+      touchButtons,
+      eventListeners: this.eventListeners ? Object.fromEntries(
+        Array.from(this.eventListeners.entries()).map(([key, listeners]) => [
+          key, 
+          listeners.length
+        ])
+      ) : {},
+      inputBufferSize: this.inputBuffer.length,
+      enhancedDetection: {
+        detectionResults,
+        positiveDetections,
+        detectionScore: Math.round(detectionScore * 100) + '%',
+        finalTouchEnabled: this.settings.touchEnabled
+      },
+      capabilities: {
+        // Legacy capabilities for backward compatibility
+        touch: primaryTouchDetection,
+        maxTouchPoints: navigator.maxTouchPoints || 0,
+        msMaxTouchPoints: navigator.msMaxTouchPoints || 0,
+        documentTouch: !!(window.DocumentTouch && document instanceof window.DocumentTouch),
+        screen: `${screenWidth}x${screenHeight}`,
+        devicePixelRatio: window.devicePixelRatio,
+        isMobileScreen: screenBasedMobileDetection,
+        isMobileUserAgent: advancedUserAgentDetection,
+        hasOrientation: 'orientation' in window,
+        hasDeviceMotion: 'ondevicemotion' in window,
+        vibrationSupported: this.vibrationSupported,
+        userAgentSnippet: userAgent.substring(0, 80) + '...',
+        // Enhanced capabilities
+        aspectRatio: Math.round(aspectRatio * 100) / 100,
+        hardwareConcurrency: navigator.hardwareConcurrency,
+        deviceMemory: navigator.deviceMemory,
+        connection: navigator.connection?.effectiveType,
+        standalone: navigator.standalone,
+        cssPointerCoarse: cssMediaQueryDetection
+      }
+    };
+  }
+
+  /**
    * Cleanup resources
    */
   destroy() {
+    console.log('🧹 Destroying InputController...');
+    
     // Clear all timers
     this.keyRepeatTimers.forEach(timer => {
       clearTimeout(timer);
@@ -941,6 +1402,7 @@ export class InputController {
     this.keyRepeatTimers.clear();
     this.touchRepeatTimers.clear();
     this.feedbackElements.clear();
+    this.touchButtons.clear();
 
     if (this.eventListeners) {
       this.eventListeners.clear();

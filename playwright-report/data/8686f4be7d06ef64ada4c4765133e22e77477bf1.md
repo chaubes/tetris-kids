@@ -3,8 +3,9 @@
 ```yaml
 - banner:
   - heading "🧩 Tetris Kids 🌈" [level=1]
-  - text: "Score: 2 Level: 1 Lines: 0"
+  - text: "Score: 9 Level: Lines:"
 - main:
+  - text: Level up! 🆙
   - complementary:
     - heading "Next Piece" [level=3]
     - heading "Controls" [level=3]

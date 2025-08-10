@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Touch Button Debug Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #222;
+            color: white;
+            margin: 0;
+        }
+        
+        .debug-container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .touch-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            margin: 20px 0;
+        }
+        
+        .touch-row {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+        
+        .btn-touch {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 3px solid rgba(255, 255, 255, 0.4);
+            font-size: 1.4rem;
+            font-weight: bold;
+            padding: 0;
+            min-width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
+            transition: all 0.15s ease;
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .btn-touch:active {
+            transform: scale(0.95);
+            background: rgba(255, 255, 255, 0.4);
+        }
+        
+        .log {
+            background: #000;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 15px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin: 20px 0;
+        }
+        
+        .log-entry {
+            margin: 2px 0;
+            padding: 2px 0;
+            border-bottom: 1px solid #333;
+        }
+        
+        .clear-btn {
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .device-info {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        
+        .device-info h3 {
+            margin-top: 0;
+        }
+        
+        .info-item {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-container">
+        <h1>🔍 Touch Button Debug Test</h1>
+        
+        <div class="device-info">
+            <h3>Device Information</h3>
+            <div class="info-item"><strong>Screen Size:</strong> <span id="screenSize"></span></div>
+            <div class="info-item"><strong>Device Pixel Ratio:</strong> <span id="devicePixelRatio"></span></div>
+            <div class="info-item"><strong>Touch Support:</strong> <span id="touchSupport"></span></div>
+            <div class="info-item"><strong>Max Touch Points:</strong> <span id="maxTouchPoints"></span></div>
+            <div class="info-item"><strong>User Agent:</strong> <span id="userAgent"></span></div>
+        </div>
+        
+        <div class="touch-controls">
+            <div class="touch-row">
+                <button id="rotateBtn" class="btn btn-touch">↻</button>
+            </div>
+            <div class="touch-row">
+                <button id="leftBtn" class="btn btn-touch">←</button>
+                <button id="downBtn" class="btn btn-touch">↓</button>
+                <button id="rightBtn" class="btn btn-touch">→</button>
+            </div>
+            <div class="touch-row">
+                <button id="dropBtn" class="btn btn-touch">⇓</button>
+            </div>
+        </div>
+        
+        <div>
+            <button class="clear-btn" onclick="clearLog()">Clear Log</button>
+            <button class="clear-btn" onclick="testTouch()">Test Touch Detection</button>
+        </div>
+        
+        <div id="eventLog" class="log">
+            <div class="log-entry">Touch button debug test loaded. Tap buttons above to test...</div>
+        </div>
+    </div>
+
+    <script>
+        // Log function
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('eventLog');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            
+            const timestamp = new Date().toLocaleTimeString();
+            const icon = type === 'error' ? '❌' : type === 'warning' ? '⚠️' : type === 'success' ? '✅' : 'ℹ️';
+            
+            entry.innerHTML = `[${timestamp}] ${icon} ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        // Clear log
+        function clearLog() {
+            document.getElementById('eventLog').innerHTML = '<div class="log-entry">Log cleared...</div>';
+        }
+        
+        // Test touch detection
+        function testTouch() {
+            log('Testing touch detection capabilities...');
+            log(`Touch events supported: ${'ontouchstart' in window}`);
+            log(`Max touch points: ${navigator.maxTouchPoints || 'unknown'}`);
+            log(`Pointer events supported: ${'onpointerdown' in window}`);
+        }
+        
+        // Display device info
+        function displayDeviceInfo() {
+            document.getElementById('screenSize').textContent = `${window.innerWidth} x ${window.innerHeight}`;
+            document.getElementById('devicePixelRatio').textContent = window.devicePixelRatio;
+            document.getElementById('touchSupport').textContent = 'ontouchstart' in window ? 'Yes' : 'No';
+            document.getElementById('maxTouchPoints').textContent = navigator.maxTouchPoints || 'Unknown';
+            document.getElementById('userAgent').textContent = navigator.userAgent.substring(0, 80) + '...';
+        }
+        
+        // Setup button event listeners
+        function setupButton(buttonId, actionName) {
+            const button = document.getElementById(buttonId);
+            if (!button) {
+                log(`Button not found: ${buttonId}`, 'error');
+                return;
+            }
+            
+            log(`Setting up button: ${actionName} (${buttonId})`);
+            
+            // Touch events
+            button.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                log(`📱 TOUCHSTART: ${actionName}`, 'success');
+                button.style.transform = 'scale(0.95)';
+                button.style.backgroundColor = 'rgba(255, 255, 255, 0.4)';
+            }, { passive: false });
+            
+            button.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                log(`📱 TOUCHEND: ${actionName}`, 'success');
+                button.style.transform = '';
+                button.style.backgroundColor = '';
+            }, { passive: false });
+            
+            button.addEventListener('touchcancel', (e) => {
+                e.preventDefault();
+                log(`📱 TOUCHCANCEL: ${actionName}`, 'warning');
+                button.style.transform = '';
+                button.style.backgroundColor = '';
+            }, { passive: false });
+            
+            // Mouse events for testing
+            button.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                log(`🖱️ MOUSEDOWN: ${actionName}`, 'info');
+                button.style.transform = 'scale(0.95)';
+                button.style.backgroundColor = 'rgba(255, 255, 255, 0.4)';
+            });
+            
+            button.addEventListener('mouseup', (e) => {
+                e.preventDefault();
+                log(`🖱️ MOUSEUP: ${actionName}`, 'info');
+                button.style.transform = '';
+                button.style.backgroundColor = '';
+            });
+            
+            // Pointer events (modern approach)
+            button.addEventListener('pointerdown', (e) => {
+                log(`👆 POINTERDOWN: ${actionName} (${e.pointerType})`);
+            });
+            
+            button.addEventListener('pointerup', (e) => {
+                log(`👆 POINTERUP: ${actionName} (${e.pointerType})`);
+            });
+        }
+        
+        // Initialize when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            log('DOM loaded, initializing touch test...', 'success');
+            displayDeviceInfo();
+            
+            // Setup all buttons
+            const buttons = [
+                ['leftBtn', 'Left'],
+                ['rightBtn', 'Right'],
+                ['downBtn', 'Down'],
+                ['rotateBtn', 'Rotate'],
+                ['dropBtn', 'Drop']
+            ];
+            
+            buttons.forEach(([id, name]) => setupButton(id, name));
+            
+            log('Touch test initialization complete!', 'success');
+            
+            // Test if buttons are found
+            buttons.forEach(([id, name]) => {
+                const btn = document.getElementById(id);
+                if (btn) {
+                    log(`Button found: ${name} (${id})`, 'success');
+                } else {
+                    log(`Button NOT found: ${name} (${id})`, 'error');
+                }
+            });
+        });
+        
+        // Global touch event logging
+        document.addEventListener('touchstart', (e) => {
+            if (!e.target.classList.contains('btn-touch')) {
+                log(`Touch started outside button: ${e.target.tagName}`, 'info');
+            }
+        });
+        
+        // Window resize handler
+        window.addEventListener('resize', () => {
+            displayDeviceInfo();
+            log('Window resized, updated device info');
+        });
+        
+        // Error logging
+        window.addEventListener('error', (e) => {
+            log(`JavaScript Error: ${e.message}`, 'error');
+        });
+        
+        log('Touch button debug test script loaded');
+    </script>
+</body>
+</html>

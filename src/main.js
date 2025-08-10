@@ -131,10 +131,29 @@ async function initializeSystems() {
     }
   });
   
-  // Force initial touch controls visibility update
+  // Force initial touch controls visibility update with multiple retries
   setTimeout(() => {
     if (inputController) {
+      console.log('🔄 Initial touch controls setup...');
       inputController.updateTouchControlsVisibility();
+      
+      // Also try to force setup touch controls if they weren't found
+      setTimeout(() => {
+        const debugInfo = inputController.getDebugInfo();
+        console.log('🔍 InputController debug info:', debugInfo);
+        
+        // Check if any buttons are missing and retry
+        const expectedButtons = ['left', 'right', 'down', 'rotate', 'drop'];
+        const missingButtons = expectedButtons.filter(btn => !debugInfo.touchButtons[btn]?.found);
+        
+        if (missingButtons.length > 0) {
+          console.warn('⚠️ Missing touch buttons:', missingButtons);
+          console.log('🔧 Attempting to force setup touch controls...');
+          inputController.forceSetupTouchControls();
+        } else {
+          console.log('✅ All touch buttons found and setup complete');
+        }
+      }, 500);
     }
   }, 100);
   
@@ -172,8 +191,11 @@ function setupSystemConnections() {
     }
   });
   
-  // Input Controller Events
+  // Input Controller Events - CRITICAL for touch button functionality
+  console.log('🔗 Connecting InputController events...');
+  
   inputController.on('input', (inputData) => {
+    console.log('🎮 Game received input from InputController:', inputData);
     handleGameInput(inputData);
   });
   
@@ -509,22 +531,40 @@ function restartGame() {
  * Handle game input from input controller
  */
 function handleGameInput(inputData) {
-  if (!gameEngine) return;
+  console.log('🔄 Processing game input:', inputData);
+  
+  if (!gameEngine) {
+    console.error('❌ GameEngine not available for input processing');
+    return;
+  }
   
   const { action, type } = inputData;
   
-  // Only process game inputs during gameplay
+  // Get current game state
   const currentState = gameEngine.stateManager.getState();
-  if (currentState.gameState !== GAME_STATES.PLAYING) return;
+  console.log('📊 Current game state:', currentState.gameState);
+  
+  // Only process game inputs during gameplay
+  if (currentState.gameState !== GAME_STATES.PLAYING) {
+    console.log(`⏸️ Ignoring input - game not playing (state: ${currentState.gameState})`);
+    return;
+  }
   
   // Convert input actions to game commands
   const gameLogic = gameEngine.getSystem('gameLogic');
-  if (!gameLogic) return;
+  if (!gameLogic) {
+    console.error('❌ GameLogic system not available');
+    return;
+  }
+  
+  console.log(`🎲 Processing ${action} ${type} with GameLogic`);
   
   switch (action) {
     case 'left':
       if (type === 'start' || type === 'repeat' || type === 'swipe') {
+        console.log('⬅️ Moving piece left');
         const moved = gameLogic.movePiece('left');
+        console.log(`⬅️ Move left result: ${moved}`);
         if (moved && soundEffects) {
           soundEffects.playSpatialSound('move', { x: gameLogic.currentPiece?.x });
           if (whimsyInjector && whimsyInjector.isInitialized) {
@@ -551,7 +591,9 @@ function handleGameInput(inputData) {
       
     case 'right':
       if (type === 'start' || type === 'repeat' || type === 'swipe') {
+        console.log('➡️ Moving piece right');
         const moved = gameLogic.movePiece('right');
+        console.log(`➡️ Move right result: ${moved}`);
         if (moved && soundEffects) {
           soundEffects.playSpatialSound('move', { x: gameLogic.currentPiece?.x });
           if (whimsyInjector && whimsyInjector.isInitialized) {
@@ -578,7 +620,9 @@ function handleGameInput(inputData) {
       
     case 'down':
       if (type === 'start' || type === 'repeat' || type === 'swipe') {
+        console.log('⬇️ Moving piece down');
         const moved = gameLogic.movePiece('down');
+        console.log(`⬇️ Move down result: ${moved}`);
         if (moved && soundEffects) {
           soundEffects.playSound('softDrop');
         }
@@ -587,8 +631,10 @@ function handleGameInput(inputData) {
       
     case 'rotate':
       if (type === 'start' || type === 'swipe') {
+        console.log('🔄 Rotating piece');
         const oldRotation = gameLogic.currentPiece ? gameLogic.currentPiece.rotation : 0;
         const success = gameLogic.rotatePiece(true);
+        console.log(`🔄 Rotate result: ${success}`);
         
         if (success && soundEffects) {
           soundEffects.playSpatialSound('rotate', { x: gameLogic.currentPiece?.x });
@@ -613,9 +659,11 @@ function handleGameInput(inputData) {
       
     case 'drop':
       if (type === 'start' || type === 'tap') {
+        console.log('⬇️ Hard dropping piece');
         const piece = gameLogic.currentPiece;
         const oldY = piece ? piece.y : 0;
         const dropDistance = gameLogic.hardDrop();
+        console.log(`⬇️ Hard drop distance: ${dropDistance}`);
         
         if (dropDistance > 0 && soundEffects) {
           soundEffects.playSpatialSound('hardDrop', { x: piece?.x });
@@ -637,8 +685,13 @@ function handleGameInput(inputData) {
       
     case 'pause':
       if (type === 'start') {
+        console.log('⏸️ Toggling pause');
         gameEngine.stateManager.togglePause();
       }
+      break;
+      
+    default:
+      console.log(`❓ Unknown action: ${action}`);
       break;
   }
 }
@@ -912,4 +965,55 @@ function getDebugInfo() {
 
 // Export for debugging
 window.gameEngine = gameEngine;
+window.inputController = inputController;
 window.getDebugInfo = getDebugInfo;
+window.debugTouch = () => {
+  if (inputController) {
+    const info = inputController.getDebugInfo();
+    console.table(info.touchButtons);
+    console.log('Full debug info:', info);
+    return info;
+  } else {
+    console.error('InputController not available');
+    return null;
+  }
+};
+window.forceSetupTouch = () => {
+  if (inputController) {
+    return inputController.forceSetupTouchControls();
+  } else {
+    console.error('InputController not available');
+    return false;
+  }
+};
+
+window.forceEnableTouch = () => {
+  if (inputController) {
+    return inputController.forceEnableTouch();
+  } else {
+    console.error('InputController not available');
+    return false;
+  }
+};
+
+window.enableTouchForMobile = () => {
+  console.log('📱 Enabling touch for mobile device...');
+  if (inputController) {
+    // Force enable touch regardless of detection
+    inputController.updateSettings({ touchEnabled: true });
+    inputController.forceEnableTouch();
+    const debugInfo = inputController.getDebugInfo();
+    console.log('✅ Touch enabled! Debug info:', debugInfo);
+    return true;
+  } else {
+    console.error('InputController not available');
+    return false;
+  }
+};
+
+console.log('🛠️ Debug utilities available:');
+console.log('- window.debugTouch() - Show touch button debug info');
+console.log('- window.forceSetupTouch() - Force setup touch controls');
+console.log('- window.forceEnableTouch() - Force enable touch capability');
+console.log('- window.enableTouchForMobile() - Enable touch for mobile browsers');
+console.log('- window.getDebugInfo() - Get full game debug info');
